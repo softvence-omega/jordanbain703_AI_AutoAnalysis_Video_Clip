@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Request
+from fastapi.responses import FileResponse
 from app.services.upload_video import upload_youtube_video
 from app.services.clipper import run_clip_generation
+from app.services.get_lang import get_language_code
 import asyncio
 
 # Keep track of pending project_id to future response
@@ -9,8 +11,9 @@ pending_clips = {}
 router = APIRouter()
 
 @router.post("/generate")
-async def handle_generate_clip(url: str):
-    response = await upload_youtube_video(url)
+async def handle_generate_clip(url: str, language=str):
+    lang_code = get_language_code(language)
+    response = await upload_youtube_video(url, lang_code)
     print("upload_video response", response)
 
     if response['code'] == 2000:
@@ -61,3 +64,8 @@ async def receive_vizard_webhook(request: Request):
     except Exception as e:
         print("❌ Webhook error:", e)
         return {"status": "failed", "error": str(e)}
+    
+@router.get("/supported language")
+def get_lang():
+    return FileResponse("language.json", media_type="application/json")
+

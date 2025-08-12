@@ -1,0 +1,81 @@
+{
+  "preferLength": {
+    "description": "Controls how long each output video will be.",
+    "default": 0,
+    "options": [
+        {"value": 0, "label": "Auto"},
+        {"value": 1, "label": "<30 sec"},
+        {"value": 2, "label": "30-60 sec"},
+        {"value": 3, "label": "60-90 sec"},
+        {"value": 4, "label": "90s-3 min"}
+    ]
+  },
+  "ratioOfClip": {
+    "description": "Controls output video shape for clips.",
+    "default": 1,
+    "options": [
+      {"value": 1, "label": "9:16"},
+      {"value": 2, "label": "1:1"},
+      {"value": 3, "label": "4:5"},
+      {"value": 4, "label": "16:9"}
+    ]
+  },
+  "removeSilenceSwitch": {
+    "description": "Remove silent gaps and filler words.",
+    "default": 0,
+    "options": [
+      {"value": 0, "label": "Disable remove silence"},
+      {"value": 1, "label": "Enable remove silence"}
+    ]
+  },
+  "subtitleSwitch": {
+    "description": "Control whether subtitles are displayed.",
+    "default": 1,
+    "options": [
+      {"value": 1, "label": "Subtitles On"},
+      {"value": 0, "label": "Subtitles Off"}
+    ]
+  },
+  "headlineSwitch": {
+    "description": "Control whether AI-generated headline is added.",
+    "default": 1,
+    "options": [
+      {"value": 1, "label": "Show headline"},
+      {"value": 0, "label": "No headline"}
+    ]
+  },
+  "emojiSwitch": {
+    "description": "Control whether auto emoji in subtitles enabled.",
+    "default": 0,
+    "options": [
+      {"value": 0, "label": "Emoji Disabled"},
+      {"value": 1, "label": "Emoji Enabled"}
+    ]
+  },
+  "highlightSwitch": {
+    "description": "Control whether auto highlight keywords enabled.",
+    "default": 0,
+    "options": [
+      {"value": 0, "label": "Highlight Disabled"},
+      {"value": 1, "label": "Highlight Enabled"}
+    ]
+  },
+  "videoType": {
+    "description": "The source of a video.",
+    "default": 1,
+    "options": [
+      {"value": 1, "label": "Remote video file"},
+      {"value": 2, "label": "YouTube"},
+      {"value": 3, "label": "Google Drive"},
+      {"value": 4, "label": "Vimeo"},
+      {"value": 5, "label": "StreamYard"},
+      {"value": 6, "label": "TikTok"},
+      {"value": 7, "label": "Twitter(X)"},
+      {"value": 8, "label": "Rumble"},
+      {"value": 9, "label": "Twitch"},
+      {"value": 10, "label": "Loom"},
+      {"value": 11, "label": "Facebook"},
+      {"value": 12, "label": "LinkedIn"}
+    ]
+  }
+}
