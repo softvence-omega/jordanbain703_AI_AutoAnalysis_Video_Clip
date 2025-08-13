@@ -4,4 +4,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 VIZARD_API_KEY = os.getenv("VIZARD_API_KEY")
-# VIZARD_API_URL = os.getenv("VIZARD_API_URL")
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.join(BASE_DIR, 'data')
+INTRO_DIR = os.path.join(DATA_DIR, 'intro')
+OUTRO_DIR = os.path.join(DATA_DIR, 'outro') 
+MERGE_DIR = os.path.join(DATA_DIR, 'merge') 

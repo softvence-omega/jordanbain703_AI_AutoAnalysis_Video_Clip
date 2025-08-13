@@ -1,7 +1,7 @@
 import requests
 from app.config import VIZARD_API_KEY
 
-def upload_video(video_url, video_type, lang="en", prefer_length=[0]):
+def upload_video(video_url, video_type, lang, prefer_length, clip_number, aspect_ratio):
     """
     Upload video to Vizard API from multiple sources
     
@@ -32,10 +32,12 @@ def upload_video(video_url, video_type, lang="en", prefer_length=[0]):
     data = {
         "lang": lang,
         "preferLength": prefer_length,
+        "ratioOfClip": aspect_ratio,
+        "maxClipNumber": clip_number,
         "videoUrl": video_url,
         "videoType": video_type
     }
-
+    print("data-----------", data)
     try:
         response = requests.post(
             "https://elb-api.vizard.ai/hvizard-server-front/open-api/v1/project/create",
@@ -55,9 +57,9 @@ def upload_remote_video(video_url, lang="en"):
     """Upload from remote video file URL"""
     return upload_video(video_url, video_type=1, lang=lang)
 
-async def upload_youtube_video(youtube_url, lang="en"):
+async def upload_youtube_video(youtube_url, lang, clipLength, clipNumber, aspectRatio):
     """Upload from YouTube URL"""
-    return upload_video(youtube_url, video_type=2, lang=lang)
+    return upload_video(youtube_url, video_type=2, lang=lang, prefer_length=clipLength, clip_number=clipNumber, aspect_ratio=aspectRatio)
 
 def upload_google_drive_video(drive_url, lang="en"):
     """Upload from Google Drive URL"""
