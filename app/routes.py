@@ -3,11 +3,12 @@ from fastapi.responses import FileResponse
 from app.services.upload_video import upload_youtube_video
 from app.services.clipper import run_clip_generation
 from app.services.get_lang import get_language_code
-from app.services.add_template import Add_Template
+from app.services.add_template import Add_intro_outro
 from app.schema import paramRequest
 import asyncio
 import os
 import shutil
+from app.config import DATA_DIR
 
 # Keep track of pending project_id to future response
 pending_clips = {}
@@ -16,15 +17,13 @@ router = APIRouter()
 
 @router.post("/generate")
 async def handle_generate_clip(
-    request: paramRequest, 
+    # request: paramRequest, 
     intro: UploadFile=File('upload intro file'), 
     outro: UploadFile=File('upload intro file')
     ):
     # Save uploaded files locally
-    intro_path = os.path.join("./uploads", intro.filename)
-    outro_path = os.path.join("./uploads", outro.filename)
-
-    os.makedirs("./uploads", exist_ok=True)
+    intro_path = os.path.join(DATA_DIR, intro.filename)
+    outro_path = os.path.join(DATA_DIR, outro.filename)
 
     with open(intro_path, "wb") as f:
         shutil.copyfileobj(intro.file, f)
@@ -33,7 +32,7 @@ async def handle_generate_clip(
         shutil.copyfileobj(outro.file, f)
         
     clip_url='https://cdn-video.vizard.ai/vizard/video/export/20250813/18252567-4fdc6f9649aa44949d66d59a8f507028.mp4?Expires=1755681880&Signature=ro7ZLfXWkthxjfV~Tek0gcnzKvgbzPp~sPpG4e1Ac-uFhuXEXaFuK6rxtMeBAQgg4Kt~7Q-P1rPWa2iZBD3RVyWTwYPSApanEXsIUzokDHc9WCqlkX6lKlMcn9g8khZZckaOCCZGB7ZKX-Ozx-WyjsW9msejph8T6JvytRdAdeQBTzWG02er658j1l~3MdMcC~r0fB6Ure69PTDNnBLZ5qcDBvtCAilpy3KExLapzDgKT6P-c9QsEamwkYEeJaeqjLw2vAViYWe7n9~ObapjXjlAehg6o2qsBHMRkoaqQfkZioJJSHF~dtgnT0s0DJCxefoZJP0sQNgIbtFjriNj0Q__&Key-Pair-Id=K1STSG6HQYFY8F'
-    Add_Template(clip_url, intro, outro)
+    Add_intro_outro(clip_url, intro_path, outro_path)
     
     # clip_length_list = [request.clipLength]
     # if not (0 <= request.maxClipNumber <= 100):
