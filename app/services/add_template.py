@@ -4,7 +4,7 @@ import shutil
 from app.config import DATA_DIR,MERGE_DIR
 from app.services.intro_outro import Add_intro_outro_logo, convert_to_same_format
 
-def Add_Template(urls, ratio, intro, outro, logo): # for testing, give intro/outro in param
+def Add_Template(clips_info, ratio, intro, outro, logo): # for testing, give intro/outro in param
     # from template id, fetch all param like intro , outro
      # Save uploaded files locally
     intro_path = os.path.join(DATA_DIR, intro.filename)
@@ -52,5 +52,6 @@ def Add_Template(urls, ratio, intro, outro, logo): # for testing, give intro/out
     print("Converting outro...")
     convert_to_same_format(outro_path, outro_conv, target_width, target_height)
     
-    Add_intro_outro_logo(urls, intro_conv, outro_conv, target_width, target_height, logo_path)
+    clips = Add_intro_outro_logo(clips_info, intro_conv, outro_conv, target_width, target_height, logo_path)
+    return clips
 

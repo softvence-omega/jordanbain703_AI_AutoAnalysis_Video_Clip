@@ -10,7 +10,7 @@ def convert_to_png(input_path, output_path):
 
 def AddLogo(input_path, logo_path, output_path, position="top-right", logo_width=150):
     """
-    ভিডিওতে logo বসায়।
+    Add logo on video
     position: top-right, top-left, bottom-right, bottom-left
     """
     positions = {
@@ -21,14 +21,13 @@ def AddLogo(input_path, logo_path, output_path, position="top-right", logo_width
     }
     overlay_pos = positions.get(position, "overlay=W-w-10:10")
 
-    # চেক করব PNG কিনা
+    # check file is PNG or NOt
     logo_ext = os.path.splitext(logo_path)[1].lower()
     if logo_ext != ".png":
         png_logo = os.path.join(DATA_DIR, "logo.png")
         convert_to_png(logo_path, png_logo)
     else:
-        png_logo = logo_path  # আগে থেকেই PNG হলে কনভার্সন লাগবে না
-
+        png_logo = logo_path 
     cmd = [
         "ffmpeg",
         "-y",

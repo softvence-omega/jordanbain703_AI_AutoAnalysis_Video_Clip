@@ -1,11 +1,11 @@
-from pydantic import BaseModel, Field, conint
-from fastapi import UploadFile
+from pydantic import BaseModel
+from typing import Optional
 
 class paramRequest(BaseModel):
     url: str 
-    lang_code: str 
+    langCode: str 
     clipLength: int 
     maxClipNumber: int
-    aspectRatio: int
+    templateId: Optional[str] = None  # ✅ Optional
 
 

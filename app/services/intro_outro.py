@@ -3,6 +3,7 @@ import subprocess
 from app.services.download_file import Download_File
 from app.config import DATA_DIR, MERGE_DIR
 from app.services.add_logo import AddLogo
+import cloudinary.uploader
 
 def convert_to_same_format(input_path, output_path, target_width, target_height, target_fps=30):
     """
@@ -30,26 +31,26 @@ def convert_to_same_format(input_path, output_path, target_width, target_height,
     subprocess.run(cmd, check=True)
     print(f"Converted: {os.path.basename(input_path)} → {target_width}x{target_height}@{target_fps}fps")
 
-def Add_intro_outro_logo(urls, intro_conv, outro_conv, target_width, target_height, logo_path):
-
-    i=1
-    for url in urls:
+def Add_intro_outro_logo(clips_info, intro_conv, outro_conv, target_width, target_height, logo_path):
+    i = 1
+    for clip in clips_info:
         # 1️⃣ Download main clip
-        main_path = Download_File(url, DATA_DIR)
+        main_path = Download_File(clip['videoUrl'], DATA_DIR)
         print(f"Downloaded main video: {main_path}")
 
-        main_conv = os.path.join(MERGE_DIR, "main_conv.mp4")
+        # 2️⃣ Convert main video
+        main_conv = os.path.join(MERGE_DIR, f"main_conv_{i}.mp4")
         print("Converting main video...")
         convert_to_same_format(main_path, main_conv, target_width, target_height)
 
-        # 5️⃣ Create list file
-        list_file = os.path.join(MERGE_DIR, "videos.txt")
+        # 3️⃣ Prepare list file for concat
+        list_file = os.path.join(MERGE_DIR, f"videos_{i}.txt")
         with open(list_file, "w", encoding="utf-8") as f:
             f.write(f"file '{os.path.abspath(intro_conv)}'\n")
             f.write(f"file '{os.path.abspath(main_conv)}'\n")
             f.write(f"file '{os.path.abspath(outro_conv)}'\n")
 
-        # 6️⃣ Merge with re-encoding (safe audio-video sync)
+        # 4️⃣ Merge videos
         final_output = os.path.join(MERGE_DIR, f"final_video{i}.mp4")
         cmd = [
             "ffmpeg",
@@ -68,20 +69,34 @@ def Add_intro_outro_logo(urls, intro_conv, outro_conv, target_width, target_heig
         ]
         subprocess.run(cmd, check=True)
         print(f"Final video created: {final_output}")
-        # logo add
-        AddLogo(final_output, logo_path, output_path=os.path.join(MERGE_DIR, f"final clip{i}.mp4"))
 
+        # 5️⃣ Add logo
+        output_with_logo = os.path.join(MERGE_DIR, f"final_clip_with_logo_{i}.mp4")
+        AddLogo(final_output, logo_path, output_path=output_with_logo)
+
+        # 6️⃣ Upload to Cloudinary
+        response = cloudinary.uploader.upload(
+            output_with_logo,
+            resource_type="video",
+            folder="reels",
+        )
+        cloud_url = response['secure_url']
+        print(f"Uploaded to Cloudinary: {cloud_url}")
+
+        # 7️⃣ Update clip's videoUrl
+        clip['videoUrl'] = cloud_url
+
+        # 8️⃣ Clean up
         os.remove(main_conv)
         os.remove(main_path)
         os.remove(final_output)
-        i+=1
+        os.remove(output_with_logo)
+        os.remove(list_file)
 
-        # add cloudinary
+        i += 1
 
-    # remove unused file
+    # Remove unused intro/outro if needed
     os.remove(intro_conv)
     os.remove(outro_conv)
-    
 
-    return "successfully added template" # return video urls
-
+    return clips_info
