@@ -14,6 +14,18 @@ pending_clips = {}
 
 router = APIRouter()
 
+def convert_aspect_ratio(aspect_ratio_label: str) -> float:
+    if aspect_ratio_label == "9:16":
+        return 1
+    elif aspect_ratio_label == "1:1":
+        return 2
+    elif aspect_ratio_label == "4:5":
+        return 3
+    elif aspect_ratio_label == "16:9":
+        return 4
+    else:
+        return 1
+
 @router.post("/generate")
 async def handle_generate_clip(
     request: paramRequest
@@ -24,11 +36,20 @@ async def handle_generate_clip(
         return {"error": "clipNumber must be between 0 and 100"}
     if request.templateId:
         # By template_id, fetch aspect_ration, intro, outro, logo, music from database
-        template_info = requests.get("")
-        aspect_ratio = template_info['aspectRatio']
-        logo = template_info['logo_file']
-        intro = template_info['intro_file']
-        outro = template_info['outro_file']
+        headers = {
+            "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbWVwN2pxbnkwMDAwdW1mOHI5OGlycjBxIiwiZW1haWwiOiJtb2hpYnVsbGFtaWF6aUBnbWFpbC5jb20iLCJyb2xlIjoiVVNFUiIsImlhdCI6MTc1NjAyMDAzNywiZXhwIjoxNzU2NjI0ODM3fQ.ziHVYHHEwVIPR6Z6_PAcjKEbZ-2GfOf4SYh9NeSvagw"
+        }
+        template_info = requests.get(f"https://reelty-be.onrender.com/api/v1/templates/{request.templateId}", headers=headers).json()['data']
+        print("Template Info:","-"*50, template_info)
+        aspect_ratio = convert_aspect_ratio(template_info['aspectRatio'])
+        logo_url = template_info['overlayLogo']
+        intro_url = template_info['introVideo']
+        outro_url = template_info['outroVideo']
+
+        print("Aspect Ratio:", aspect_ratio)
+        print("Intro URL:", intro_url)
+        print("Outro URL:", outro_url)
+        print("Logo URL:", logo_url)
     else:
         aspect_ratio=1
                 
@@ -46,15 +67,15 @@ async def handle_generate_clip(
         try:
             clip_res = await asyncio.wait_for(future, timeout=300.0)
             if request.templateId: 
-                clips = Add_Template(clip_res['videos'], aspect_ratio, intro, outro, logo)
+                clips = Add_Template(clip_res['videos'], template_info['aspectRatio'], intro_url, outro_url, logo_url)
                 clip_res['videos'] = clips
             return {"status": "done", "clip_number":len(clip_res['videos']), "clips": clip_res['videos']}
         except asyncio.TimeoutError:
             del pending_clips[project_id]
             return {"status": "timeout", "message": "Webhook response took too long."}
     else:
-        return {"status": "failed", "reason": response.get("message", "Upload failed")}
-    
+        return {"status": "failed", "reason": response.get("message", "Upload failed"), "details": response}
+
 
 
 # webhook router for realtime
