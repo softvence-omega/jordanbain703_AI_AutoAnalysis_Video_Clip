@@ -1,12 +1,18 @@
+from urllib import response
 from fastapi import APIRouter, Request, UploadFile, File
 from fastapi.responses import FileResponse
-from app.services.upload_video import upload_youtube_video
+from app.services.filter_clips import filter_clips
+from app.services.upload_video import upload_video
 from app.services.clipper import run_clip_generation
 from app.services.get_lang import get_language_code
 from app.services.add_template import Add_Template
+from app.services.duration_find import get_youtube_duration, get_drive_duration, get_cloudinary_video_duration
 from app.schema import paramRequest
 import asyncio
 import requests
+import os
+from dotenv import load_dotenv
+load_dotenv(override=True)  # <-- this must come before accessing os.getenv()
 
 
 # Keep track of pending project_id to future response
@@ -30,17 +36,24 @@ def convert_aspect_ratio(aspect_ratio_label: str) -> float:
 async def handle_generate_clip(
     request: paramRequest
     ):
-    
+    print("prompt-----------", request.prompt)
+    # Validate parameters
     clip_length_list = [request.clipLength]
     if not (0 <= request.maxClipNumber <= 100):
         return {"error": "clipNumber must be between 0 and 100"}
     if request.templateId:
         # By template_id, fetch aspect_ration, intro, outro, logo, music from database
         headers = {
-            "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbWVwN2pxbnkwMDAwdW1mOHI5OGlycjBxIiwiZW1haWwiOiJtb2hpYnVsbGFtaWF6aUBnbWFpbC5jb20iLCJyb2xlIjoiVVNFUiIsImlhdCI6MTc1NjAyMDAzNywiZXhwIjoxNzU2NjI0ODM3fQ.ziHVYHHEwVIPR6Z6_PAcjKEbZ-2GfOf4SYh9NeSvagw"
+            "Authorization": f"Bearer {os.getenv('TOKEN')}"
         }
-        template_info = requests.get(f"https://reelty-be.onrender.com/api/v1/templates/{request.templateId}", headers=headers).json()['data']
-        print("Template Info:","-"*50, template_info)
+        try:
+            template_info = requests.get(f"https://reelty-be-1.onrender.com/api/v1/templates/{request.templateId}", headers=headers)
+            template_info.raise_for_status()
+            template_info = template_info.json()['data']
+            print("Template Info:","-"*50, template_info)
+        except Exception as e:
+            return {"error": f"Failed to fetch template info: {str(e)}"}
+        
         aspect_ratio = convert_aspect_ratio(template_info['aspectRatio'])
         logo_url = template_info['overlayLogo']
         intro_url = template_info['introVideo']
@@ -52,9 +65,20 @@ async def handle_generate_clip(
         print("Logo URL:", logo_url)
     else:
         aspect_ratio=1
-                
-    response = await upload_youtube_video(request.url, request.langCode, clip_length_list, request.maxClipNumber, aspect_ratio)
-    print("upload_video response", response)
+    
+    # find out video duration
+    ext = None
+    if request.videoType==1:
+        duration_seconds, ext = get_cloudinary_video_duration(request.url)
+    elif request.videoType==2:
+        duration_seconds = get_youtube_duration(request.url)
+    elif request.videoType==3:
+        duration_seconds = get_drive_duration(request.url)
+    if round(duration_seconds) < 180:
+        return {"error": "Video duration must be at least 180 seconds"}
+    print("main video duration-----------", round(duration_seconds))
+    
+    response = upload_video(request.url, video_type=request.videoType, lang=request.langCode, prefer_length=clip_length_list, clip_number=request.maxClipNumber, aspect_ratio=aspect_ratio, ext=ext)
 
     if response['code'] == 2000:
         project_id = response['projectId']
@@ -66,9 +90,13 @@ async def handle_generate_clip(
 
         try:
             clip_res = await asyncio.wait_for(future, timeout=300.0)
+
             if request.templateId: 
                 clips = Add_Template(clip_res['videos'], template_info['aspectRatio'], intro_url, outro_url, logo_url)
                 clip_res['videos'] = clips
+            # filter clips based on prompt
+            clip_res['videos'] = filter_clips(clip_res['videos'], request.prompt)
+
             return {"status": "done", "clip_number":len(clip_res['videos']), "clips": clip_res['videos']}
         except asyncio.TimeoutError:
             del pending_clips[project_id]
@@ -83,7 +111,7 @@ async def handle_generate_clip(
 async def receive_vizard_webhook(request: Request):
     try:
         data = await request.json()
-        print("📩 Vizard Webhook Received:", data)
+        print("📩 Vizard Webhook Received:---------", data)
 
         project_id = data.get("projectId")
         code = data.get("code")

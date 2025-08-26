@@ -6,3 +6,8 @@ uvicorn
 python-multipart
 pillow
 cloudinary
+sentence-transformers
+numpy
+yt_dlp
+imageio-ffmpeg
+gdown

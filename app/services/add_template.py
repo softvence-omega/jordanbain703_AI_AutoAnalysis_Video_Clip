@@ -58,4 +58,7 @@ def Add_Template(clips_info, ratio, intro_url, outro_url, logo_url):
 
     # Merge intro, outro, and clips
     clips = Add_intro_outro_logo(clips_info, intro_conv, outro_conv, target_width, target_height, logo_path)
+    os.remove(intro_path)
+    os.remove(outro_path)
+    os.remove(logo_path)
     return clips

@@ -5,11 +5,10 @@ from app.config import DATA_DIR, MERGE_DIR
 from app.services.add_logo import AddLogo
 import cloudinary.uploader
 from dotenv import load_dotenv
+import cloudinary
 
 load_dotenv(override=True)  # <-- this must come before accessing os.getenv()
 print("API_KEY:", os.getenv("API_KEY"))
-
-import cloudinary
 
 cloudinary.config(
     cloud_name=os.getenv("CLOUD_NAME"),
@@ -46,6 +45,8 @@ def convert_to_same_format(input_path, output_path, target_width, target_height,
 def Add_intro_outro_logo(clips_info, intro_conv, outro_conv, target_width, target_height, logo_path):
     i = 1
     for clip in clips_info:
+        print(f"Processing clip {i}")
+        print("-"*70)
         main_path = main_conv = list_file = final_output = output_with_logo = None
         try:
             # 1️⃣ Download main clip
@@ -65,7 +66,7 @@ def Add_intro_outro_logo(clips_info, intro_conv, outro_conv, target_width, targe
                 f.write(f"file '{os.path.abspath(outro_conv)}'\n")
 
             # 4️⃣ Merge videos
-            final_output = os.path.join(MERGE_DIR, f"final_video{i}.mp4")
+            final_output = os.path.join(MERGE_DIR, f"final_video_clip_{i}.mp4")
             cmd = [
                 "ffmpeg",
                 "-y",
@@ -108,7 +109,7 @@ def Add_intro_outro_logo(clips_info, intro_conv, outro_conv, target_width, targe
 
         finally:
             # Clean up temporary files safely
-            for file in [main_path, main_conv, final_output, output_with_logo, list_file]:
+            for file in [main_path, main_conv, final_output, list_file]: # output_with_logo required to include
                 if file and os.path.exists(file):
                     try:
                         os.remove(file)

@@ -10,6 +10,7 @@ def Download_File(url, file_path):
     path = parsed_url.path
     # Extract filename
     filename = os.path.basename(path)
+    print("Original filename:----", filename)
     # Split filename and extension
     name, ext = os.path.splitext(filename)
 
