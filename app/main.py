@@ -2,7 +2,10 @@ from fastapi import FastAPI, Request
 import uvicorn
 from app.routes import router 
 
-app = FastAPI()
+app = FastAPI(
+    title="Reelty AI API",
+    docs_url="/ai-api/v1",
+)
 
 app.include_router(router)
 

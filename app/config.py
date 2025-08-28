@@ -11,10 +11,8 @@ INTRO_DIR = os.path.join(DATA_DIR, 'intro')
 OUTRO_DIR = os.path.join(DATA_DIR, 'outro') 
 MERGE_DIR = os.path.join(DATA_DIR, 'merge') 
 
-import cloudinary
-# Configure Cloudinary
-cloudinary.config(
-  cloud_name = os.getenv("CLOUD_NAME"),
-  api_key = os.getenv("API_KEY"),
-  api_secret = os.getenv("API_SECRET")
-)
+cloud_name = os.getenv("CLOUD_NAME")
+api_key = os.getenv("API_KEY")
+api_secret = os.getenv("API_SECRET")
+
+BACKEND_URL = "https://reelty-be-1.onrender.com/api/v1"

@@ -1,7 +1,7 @@
 import requests
 from app.config import VIZARD_API_KEY
 
-def upload_video(video_url, video_type, lang, prefer_length, clip_number, aspect_ratio):
+def upload_video(video_url, video_type, lang, prefer_length, clip_number, aspect_ratio, ext=None):
     """
     Upload video to Vizard API from multiple sources
     
@@ -35,7 +35,10 @@ def upload_video(video_url, video_type, lang, prefer_length, clip_number, aspect
         "ratioOfClip": aspect_ratio,
         "maxClipNumber": clip_number,
         "videoUrl": video_url,
-        "videoType": video_type
+        "videoType": video_type,
+        "includeTranscript": True,
+        "contentAnalysis": True,
+        "ext": ext
     }
     print("data-----------", data)
     try:
@@ -49,7 +52,11 @@ def upload_video(video_url, video_type, lang, prefer_length, clip_number, aspect
     
     except requests.exceptions.RequestException as e:
         print(f"Error uploading video: {e}")
-        return None
+        return {
+            "code": 5000,
+            "message": "Upload failed",
+            "details": str(e)
+        }
 
 # Example usage functions for each video type
 
