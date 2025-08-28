@@ -2,6 +2,7 @@ from pydantic import BaseModel
 from typing import Optional
 
 class paramRequest(BaseModel):
+    auth_token: str
     url: str 
     videoType: int
     langCode: str = "en" 

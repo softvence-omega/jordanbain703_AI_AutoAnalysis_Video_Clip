@@ -37,7 +37,8 @@ def upload_video(video_url, video_type, lang, prefer_length, clip_number, aspect
         "videoUrl": video_url,
         "videoType": video_type,
         "includeTranscript": True,
-        "contentAnalysis": True
+        "contentAnalysis": True,
+        "ext": ext
     }
     print("data-----------", data)
     try:

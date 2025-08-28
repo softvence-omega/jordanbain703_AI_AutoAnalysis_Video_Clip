@@ -44,6 +44,8 @@ def AddLogo(input_path, logo_path, output_path, position="top-right", logo_width
     ]
     subprocess.run(cmd, check=True)
     print(f"Logo added to video: {output_path}")
+    os.remove(png_logo)  # remove temporary png logo file
+    os.remove(logo_path)  # remove original logo file
 
 if __name__=="__main__":
     input_path = os.path.join(MERGE_DIR, 'final_video1.mp4')

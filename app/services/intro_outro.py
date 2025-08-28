@@ -6,6 +6,7 @@ from app.services.add_logo import AddLogo
 import cloudinary.uploader
 from dotenv import load_dotenv
 import cloudinary
+from app.services.duration_find import get_video_duration_ffmpeg
 
 load_dotenv(override=True)  # <-- this must come before accessing os.getenv()
 print("API_KEY:", os.getenv("API_KEY"))
@@ -89,7 +90,11 @@ def Add_intro_outro_logo(clips_info, intro_conv, outro_conv, target_width, targe
             output_with_logo = os.path.join(MERGE_DIR, f"final_clip_with_logo_{i}.mp4")
             AddLogo(final_output, logo_path, output_path=output_with_logo)
 
-            # 6️⃣ Upload to Cloudinary
+            # Find duration
+            duration = get_video_duration_ffmpeg(output_with_logo)
+            clip['duration'] = duration
+
+            # Upload to Cloudinary
             try:
                 response = cloudinary.uploader.upload(
                     output_with_logo,
@@ -109,7 +114,7 @@ def Add_intro_outro_logo(clips_info, intro_conv, outro_conv, target_width, targe
 
         finally:
             # Clean up temporary files safely
-            for file in [main_path, main_conv, final_output, list_file]: # output_with_logo required to include
+            for file in [main_path, main_conv, final_output, output_with_logo, list_file]: 
                 if file and os.path.exists(file):
                     try:
                         os.remove(file)
