@@ -24,20 +24,37 @@ def convert_to_same_format(input_path, output_path, target_width, target_height,
     """
     vf_filter = f"scale={target_width}:{target_height}:force_original_aspect_ratio=decrease,pad={target_width}:{target_height}:(ow-iw)/2:(oh-ih)/2:black"
     
+    # cmd = [
+    #     "ffmpeg",
+    #     "-y",
+    #     "-i", input_path,
+    #     "-c:v", "libx264",
+    #     "-preset", "fast",
+    #     "-crf", "23",
+    #     "-r", str(target_fps),        # Force frame rate
+    #     "-vf", vf_filter,
+    #     "-c:a", "aac",                # Audio codec
+    #     "-ar", "44100",               # Sample rate
+    #     "-ac", "2",                   # Stereo channels
+    #     "-b:a", "128k",               # Audio bitrate
+    #     "-movflags", "+faststart",    # Better playback
+    #     output_path
+    # ]
     cmd = [
         "ffmpeg",
         "-y",
+        "-hwaccel", "cuda",         # GPU acceleration enable
         "-i", input_path,
-        "-c:v", "libx264",
+        "-c:v", "h264_nvenc",       # NVIDIA GPU encoder (instead of libx264)
         "-preset", "fast",
-        "-crf", "23",
-        "-r", str(target_fps),        # Force frame rate
+        "-b:v", "5M",               # bitrate (তুমি চাইলে crf বাদ দিতে পারো)
+        "-r", str(target_fps),
         "-vf", vf_filter,
-        "-c:a", "aac",                # Audio codec
-        "-ar", "44100",               # Sample rate
-        "-ac", "2",                   # Stereo channels
-        "-b:a", "128k",               # Audio bitrate
-        "-movflags", "+faststart",    # Better playback
+        "-c:a", "aac",
+        "-ar", "44100",
+        "-ac", "2",
+        "-b:a", "128k",
+        "-movflags", "+faststart",
         output_path
     ]
     subprocess.run(cmd, check=True)

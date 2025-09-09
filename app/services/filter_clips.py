@@ -1,7 +1,9 @@
 from sentence_transformers import SentenceTransformer, util
+import torch
 
 # Load model (multilingual)
-model = SentenceTransformer("intfloat/multilingual-e5-base")
+device = "cuda" if torch.cuda.is_available() else "cpu"
+model = SentenceTransformer("intfloat/multilingual-e5-base", device=device)
 
 def filter_clips(clips, query, threshold=0.5):
     # 2. Embed Each Transcript
