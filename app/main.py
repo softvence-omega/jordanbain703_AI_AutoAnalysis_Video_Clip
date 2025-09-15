@@ -8,14 +8,13 @@ app = FastAPI(
     docs_url="/ai-api/v1",
 )
 
-# origins = [
-#     "http://localhost:5173",  # frontend
-#     "http://127.0.0.1:5173"
-# ]
+origins = [
+    "http://65.49.81.27:3000"
+]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Update this with your frontend URL
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
