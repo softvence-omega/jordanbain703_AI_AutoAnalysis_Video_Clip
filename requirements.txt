@@ -7,7 +7,7 @@ python-multipart
 pillow
 cloudinary
 sentence-transformers
-numpy
+numpy==1.26.4
 yt_dlp
 imageio-ffmpeg
 gdown

@@ -78,6 +78,8 @@ async def handle_generate_clip(
         duration_seconds = get_drive_duration(request.url)
     if round(duration_seconds) < 180:
         return {"error": "Video duration must be at least 180 seconds"}
+    if round(duration_seconds) > 3600:
+        return {"error": "Video duration must be less then 3600 seconds"}
     print("main video duration-----------", round(duration_seconds))
 
     # Validate supported extension
@@ -97,7 +99,7 @@ async def handle_generate_clip(
         pending_clips[project_id] = future
 
         try:
-            clip_res = await asyncio.wait_for(future, timeout=300.0)
+            clip_res = await asyncio.wait_for(future, timeout=500.0)
 
             if request.templateId: 
                 clips = Add_Template(clip_res['videos'], template_info['aspectRatio'], intro_url, outro_url, logo_url)
@@ -151,11 +153,11 @@ async def receive_vizard_webhook(request: Request):
         print("❌ Webhook error:", e)
         return {"status": "failed", "error": str(e)}
     
-@router.get("/supported language")
+@router.get("/supported-language")
 def get_lang():
     return FileResponse("language.json", media_type="application/json")
 
-@router.get("/supported param")
+@router.get("/supported-param")
 def get_param():
     return FileResponse("supported_param.json", media_type="application/json")
 

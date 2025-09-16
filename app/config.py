@@ -15,4 +15,4 @@ cloud_name = os.getenv("CLOUD_NAME")
 api_key = os.getenv("API_KEY")
 api_secret = os.getenv("API_SECRET")
 
-BACKEND_URL = "https://reelty-be-1.onrender.com/api/v1"
+BACKEND_URL = "http://65.49.81.27:5000/api/v1"
