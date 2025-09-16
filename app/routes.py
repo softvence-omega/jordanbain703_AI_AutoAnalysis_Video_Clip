@@ -69,6 +69,7 @@ async def handle_generate_clip(
         aspect_ratio=1
     
     # find out video duration
+    print("-----------finding Duration-------------------")
     ext = None
     if request.videoType==1:
         duration_seconds, ext = get_cloudinary_video_duration(request.url)
@@ -88,6 +89,8 @@ async def handle_generate_clip(
         raise ValueError(f"Unsupported video file extension: {ext}. Supported: {', '.join(supported_exts)}")
     print('extension-----------', ext)
 
+    # Upload Video to Vizard
+    print("----------------uploading video-------------")
     response = upload_video(request.url, video_type=request.videoType, lang=request.langCode, prefer_length=clip_length_list, clip_number=request.maxClipNumber, aspect_ratio=aspect_ratio, ext=ext)
 
     if response['code'] == 2000:
@@ -104,9 +107,14 @@ async def handle_generate_clip(
             if request.templateId: 
                 clips = Add_Template(clip_res['videos'], template_info['aspectRatio'], intro_url, outro_url, logo_url)
                 clip_res['videos'] = clips
+            print('-'*60)
+            print(clip_res['videos'])    
             # filter clips based on prompt
             if request.prompt and request.prompt.strip() != "" and request.prompt.lower() != "string":
-                clip_res['videos'] = filter_clips(clip_res['videos'], request.prompt)
+                videos = clip_res['videos']
+                # Skip filter_clips if the first clip is missing 'transcript'
+                if videos and "transcript" in videos[0] and videos[0]["transcript"]:
+                    clip_res['videos'] = filter_clips(videos, request.prompt)
 
             # credit calculate , 1min = 1 credit
             total_duration = sum(clip['duration'] for clip in clip_res['videos'])

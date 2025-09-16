@@ -19,11 +19,11 @@ def store_response_in_db(id, auth_token, response_data, credit_usage):
     }
 
     for clip in response_data:
-        relatedTopic = string_to_array(clip["relatedTopic"])
+        relatedTopic = string_to_array(clip.get("relatedTopic", ""))
         data["clips"].append({
             "viralScore": clip["viralScore"],
             "relatedTopic": relatedTopic,
-            "transcript": clip["transcript"],
+            "transcript": clip.get("transcript", ""),
             "videoUrl": clip["videoUrl"],
             "clipEditorUrl": clip["clipEditorUrl"],
             "videoMsDuration": clip["videoMsDuration"],
