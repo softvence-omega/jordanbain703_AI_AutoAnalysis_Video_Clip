@@ -13,6 +13,7 @@ from app.config import BACKEND_URL
 import asyncio
 import requests
 import os
+import time
 from dotenv import load_dotenv
 load_dotenv(override=True)  # <-- this must come before accessing os.getenv()
 
@@ -78,7 +79,7 @@ async def handle_generate_clip(
         duration_seconds = get_youtube_duration(request.url)
     elif request.videoType==3:
         duration_seconds = get_drive_duration(request.url)
-    print("Video Duration (seconds):", duration_seconds)
+    print("Video Duration (seconds):------------", duration_seconds)
 
     # if round(duration_seconds) < 180:
     #     return {"error": "Video duration must be at least 180 seconds"}
@@ -98,7 +99,8 @@ async def handle_generate_clip(
 
     if response['code'] == 2000:
         project_id = response['projectId']
-        print(f"Video uploaded successfully: {project_id}")
+        print("Project ID:--------", project_id)
+        print("Waiting for clip generation...")
 
         # Create cancellable future
         loop = asyncio.get_event_loop()

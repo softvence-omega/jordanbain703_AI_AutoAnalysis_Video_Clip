@@ -85,21 +85,37 @@ def Add_intro_outro_logo(clips_info, intro_conv, outro_conv, target_width, targe
 
             # 4️⃣ Merge videos
             final_output = os.path.join(MERGE_DIR, f"final_video_clip_{i}.mp4")
+            # cmd = [
+            #     "ffmpeg",
+            #     "-y",
+            #     "-f", "concat",
+            #     "-safe", "0",
+            #     "-i", list_file,
+            #     "-c:v", "libx264",
+            #     "-preset", "fast",
+            #     "-crf", "23",
+            #     "-c:a", "aac",
+            #     "-b:a", "128k",
+            #     "-ar", "44100",
+            #     "-ac", "2",
+            #     final_output
+            # ]
             cmd = [
                 "ffmpeg",
                 "-y",
                 "-f", "concat",
                 "-safe", "0",
                 "-i", list_file,
-                "-c:v", "libx264",
+                "-c:v", "h264_nvenc",      # GPU encoder
                 "-preset", "fast",
-                "-crf", "23",
+                "-cq", "23",               # Quality similar to CRF
                 "-c:a", "aac",
                 "-b:a", "128k",
                 "-ar", "44100",
                 "-ac", "2",
                 final_output
             ]
+
             subprocess.run(cmd, check=True)
             print(f"Final video created: {final_output}")
 

@@ -58,8 +58,6 @@ def get_youtube_duration(url):
 # duration_seconds = get_youtube_duration(url)
 # print("Video Duration (seconds):", duration_seconds)
 
-
-
 #Find out Duration from google Drive
 def extract_drive_file_id(url):
     pattern = r"/file/d/([a-zA-Z0-9_-]+)"
