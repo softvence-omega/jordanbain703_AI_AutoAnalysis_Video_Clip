@@ -10,3 +10,7 @@ class paramRequest(BaseModel):
     maxClipNumber: int = 2
     templateId: Optional[str] = None  
     prompt: Optional[str] = None
+
+class CancelResponse(BaseModel):
+    status: str
+    message: str

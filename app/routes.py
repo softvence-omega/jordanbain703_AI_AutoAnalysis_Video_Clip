@@ -1,5 +1,5 @@
 from urllib import response
-from fastapi import APIRouter, Request, UploadFile, File
+from fastapi import APIRouter, HTTPException, Request, UploadFile, File
 from fastapi.responses import FileResponse
 from app.services.filter_clips import filter_clips
 from app.services.upload_video import upload_video
@@ -7,7 +7,7 @@ from app.services.clipper import run_clip_generation
 from app.services.get_lang import get_language_code
 from app.services.add_template import Add_Template
 from app.services.duration_find import get_youtube_duration, get_drive_duration, get_cloudinary_video_duration
-from app.schema import paramRequest
+from app.schema import paramRequest, CancelResponse
 from app.services.store_response import store_in_db
 from app.config import BACKEND_URL
 import asyncio
@@ -19,6 +19,7 @@ load_dotenv(override=True)  # <-- this must come before accessing os.getenv()
 
 # Keep track of pending project_id to future response
 pending_clips = {}
+cancelled_tasks = set()
 
 router = APIRouter()
 
@@ -34,7 +35,7 @@ def convert_aspect_ratio(aspect_ratio_label: str) -> float:
     else:
         return 1
 
-@router.post("/generate")
+@router.post("/generate", tags=["Video Processing"])
 async def handle_generate_clip(
     request: paramRequest
     ):
@@ -77,11 +78,13 @@ async def handle_generate_clip(
         duration_seconds = get_youtube_duration(request.url)
     elif request.videoType==3:
         duration_seconds = get_drive_duration(request.url)
-    if round(duration_seconds) < 180:
-        return {"error": "Video duration must be at least 180 seconds"}
+    print("Video Duration (seconds):", duration_seconds)
+
+    # if round(duration_seconds) < 180:
+    #     return {"error": "Video duration must be at least 180 seconds"}
     if round(duration_seconds) > 3600:
         return {"error": "Video duration must be less then 3600 seconds"}
-    print("main video duration-----------", round(duration_seconds))
+    
 
     # Validate supported extension
     supported_exts = ["mp4", "3gp", "avi", "mov"]
@@ -95,50 +98,182 @@ async def handle_generate_clip(
 
     if response['code'] == 2000:
         project_id = response['projectId']
+        print(f"Video uploaded successfully: {project_id}")
 
-        # Create a future and wait for webhook
+        # Create cancellable future
         loop = asyncio.get_event_loop()
         future = loop.create_future()
-        pending_clips[project_id] = future
+        pending_clips[project_id] = {
+            'future': future,
+            'request': request,
+            'template_info': template_info if request.templateId else None
+        }
 
         try:
+            # Wait for webhook with cancellation support
             clip_res = await asyncio.wait_for(future, timeout=500.0)
 
-            if request.templateId: 
+            # Check if task was cancelled during processing
+            if project_id in cancelled_tasks:
+                print(f"Task {project_id} was cancelled, terminating...")
+                cancelled_tasks.discard(project_id)
+                if project_id in pending_clips:
+                    del pending_clips[project_id]
+                return {"status": "cancelled", "message": "Task was cancelled by user"}
+
+            # Process clips only if not cancelled
+            if request.templateId and project_id not in cancelled_tasks:
                 clips = Add_Template(clip_res['videos'], template_info['aspectRatio'], intro_url, outro_url, logo_url)
                 clip_res['videos'] = clips
+            
             print('-'*60)
             print(clip_res['videos'])    
-            # filter clips based on prompt
-            if request.prompt and request.prompt.strip() != "" and request.prompt.lower() != "string":
+            
+            # Filter clips based on prompt - check cancellation again
+            if (request.prompt and request.prompt.strip() != "" and 
+                request.prompt.lower() != "string" and project_id not in cancelled_tasks):
                 videos = clip_res['videos']
-                # Skip filter_clips if the first clip is missing 'transcript'
                 if videos and "transcript" in videos[0] and videos[0]["transcript"]:
                     clip_res['videos'] = filter_clips(videos, request.prompt)
 
-            # credit calculate , 1min = 1 credit
+            # Final cancellation check before storing
+            if project_id in cancelled_tasks:
+                print(f"Task {project_id} was cancelled before storing, terminating...")
+                cancelled_tasks.discard(project_id)
+                if project_id in pending_clips:
+                    del pending_clips[project_id]
+                return {"status": "cancelled", "message": "Task was cancelled by user"}
+
+            # Calculate credits
             total_duration = sum(clip['duration'] for clip in clip_res['videos'])
             total_credits = total_duration // 60
             print(f"Total Duration: {total_duration} seconds")
             print(f"Total Credits: {total_credits}")
             
-            # store in database
+            # Store in database
             clips_stored_id = store_in_db(request, clip_res["videos"], total_credits, main_video_duration=round(duration_seconds))
             if not clips_stored_id:
+                if project_id in pending_clips:
+                    del pending_clips[project_id]
                 return {"status": "error", "message": "Failed to store clips in database."}
 
-            return {"status": "done", "clip_number":len(clip_res['videos']), "credit_usage": total_credits,"clip_stored_id": clips_stored_id, "clips": clip_res['videos']}
+            # Success - cleanup
+            if project_id in pending_clips:
+                del pending_clips[project_id]
+
+            return {
+                "status": "done", 
+                "clip_number": len(clip_res['videos']), 
+                "credit_usage": total_credits,
+                "clip_stored_id": clips_stored_id, 
+                "clips": clip_res['videos']
+            }
+            
         except asyncio.TimeoutError:
-            del pending_clips[project_id]
+            if project_id in pending_clips:
+                del pending_clips[project_id]
             return {"status": "timeout", "message": "Webhook response took too long."}
+        
+        except asyncio.CancelledError:
+            print(f"Task {project_id} was cancelled via asyncio")
+            if project_id in pending_clips:
+                del pending_clips[project_id]
+            cancelled_tasks.discard(project_id)
+            return {"status": "cancelled", "message": "Task was cancelled by user"}
+        
+        except Exception as e:
+            if project_id in pending_clips:
+                del pending_clips[project_id]
+            return {"status": "failed", "error": str(e)}
     else:
         return {"status": "failed", "reason": response.get("message", "Upload failed"), "details": response}
+    #     project_id = response['projectId']
 
+    #     # Create a future and wait for webhook
+    #     loop = asyncio.get_event_loop()
+    #     future = loop.create_future()
+    #     pending_clips[project_id] = future
 
+    #     try:
+    #         clip_res = await asyncio.wait_for(future, timeout=500.0)
+
+    #         if request.templateId: 
+    #             clips = Add_Template(clip_res['videos'], template_info['aspectRatio'], intro_url, outro_url, logo_url)
+    #             clip_res['videos'] = clips
+    #         print('-'*60)
+    #         print(clip_res['videos'])    
+    #         # filter clips based on prompt
+    #         if request.prompt and request.prompt.strip() != "" and request.prompt.lower() != "string":
+    #             videos = clip_res['videos']
+    #             # Skip filter_clips if the first clip is missing 'transcript'
+    #             if videos and "transcript" in videos[0] and videos[0]["transcript"]:
+    #                 clip_res['videos'] = filter_clips(videos, request.prompt)
+
+    #         # credit calculate , 1min = 1 credit
+    #         total_duration = sum(clip['duration'] for clip in clip_res['videos'])
+    #         total_credits = total_duration // 60
+    #         print(f"Total Duration: {total_duration} seconds")
+    #         print(f"Total Credits: {total_credits}")
+            
+    #         # store in database
+    #         clips_stored_id = store_in_db(request, clip_res["videos"], total_credits, main_video_duration=round(duration_seconds))
+    #         if not clips_stored_id:
+    #             return {"status": "error", "message": "Failed to store clips in database."}
+
+    #         return {"status": "done", "clip_number":len(clip_res['videos']), "credit_usage": total_credits,"clip_stored_id": clips_stored_id, "clips": clip_res['videos']}
+    #     except asyncio.TimeoutError:
+    #         del pending_clips[project_id]
+    #         return {"status": "timeout", "message": "Webhook response took too long."}
+    # else:
+    #     return {"status": "failed", "reason": response.get("message", "Upload failed"), "details": response}
+
+# cancel endpoint
+@router.post("/cancel/{project_id}", response_model=CancelResponse, tags=["Video Processing"])
+async def cancel_task(project_id: int):
+    """
+    Cancel a running video processing task by project ID
+    
+    - **project_id**: The project ID returned from generate endpoint
+    - **Returns**: Cancellation status and message
+    
+    Example usage:
+    ```
+    POST /cancel/12345
+    ```
+    """
+    print("Pending tasks:", pending_clips)
+    if project_id not in pending_clips:
+        raise HTTPException(status_code=404, detail="Task not found or already completed")
+    
+    print(f"Cancelling task: {project_id}")
+
+    # Add to cancelled set
+    cancelled_tasks.add(project_id)
+    
+    # Cancel the future immediately
+    task_data = pending_clips[project_id]
+    future = task_data['future']
+    
+    if not future.done():
+        future.cancel()
+    
+    # Remove from pending
+    del pending_clips[project_id]
+    
+    return CancelResponse(
+        status="cancelled", 
+        message=f"Task {project_id} has been cancelled successfully"
+    )
 
 # webhook router for realtime
-@router.post("/webhook/vizard")
+@router.post("/webhook/vizard", tags=["Webhooks"])
 async def receive_vizard_webhook(request: Request):
+    """
+    Receive webhook from Vizard API when video processing is complete
+    
+    - **Internal endpoint**: Used by Vizard service only
+    - **Returns**: Processing status
+    """
     try:
         data = await request.json()
         print("📩 Vizard Webhook Received:---------", data)
@@ -146,20 +281,52 @@ async def receive_vizard_webhook(request: Request):
         project_id = data.get("projectId")
         code = data.get("code")
         print(f"{code} and project id {project_id}")
+        
         if code == 2000 and project_id:
-            print("success-----------")
-            # Resolve the future if it's waiting
-            future = pending_clips.get(project_id)
-            if future and not future.done():
-                future.set_result(data)  # webhook data direct pass
-                del pending_clips[project_id]
-
-            return {"status": "clip generation ready"}
+            # Check if task was cancelled
+            if project_id in cancelled_tasks:
+                print(f"Webhook received for cancelled task {project_id}, ignoring...")
+                return {"status": "task_was_cancelled"}
+            
+            # Process webhook if task is still pending
+            if project_id in pending_clips:
+                print("success-----------")
+                future = pending_clips[project_id]['future']
+                if not future.done():
+                    future.set_result(data)  # webhook data direct pass
+                return {"status": "clip generation ready"}
+            else:
+                print(f"Project {project_id} not found in pending clips")
+                return {"status": "project_not_found"}
 
         return {"status": "ignored", "reason": "Invalid code or missing projectId"}
     except Exception as e:
         print("❌ Webhook error:", e)
         return {"status": "failed", "error": str(e)}
+    
+# @router.post("/webhook/vizard")
+# async def receive_vizard_webhook(request: Request):
+#     try:
+#         data = await request.json()
+#         print("📩 Vizard Webhook Received:---------", data)
+
+#         project_id = data.get("projectId")
+#         code = data.get("code")
+#         print(f"{code} and project id {project_id}")
+#         if code == 2000 and project_id:
+#             print("success-----------")
+#             # Resolve the future if it's waiting
+#             future = pending_clips.get(project_id)
+#             if future and not future.done():
+#                 future.set_result(data)  # webhook data direct pass
+#                 del pending_clips[project_id]
+
+#             return {"status": "clip generation ready"}
+
+#         return {"status": "ignored", "reason": "Invalid code or missing projectId"}
+#     except Exception as e:
+#         print("❌ Webhook error:", e)
+#         return {"status": "failed", "error": str(e)}
     
 @router.get("/supported-language")
 def get_lang():
