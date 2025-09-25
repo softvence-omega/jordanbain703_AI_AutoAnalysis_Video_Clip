@@ -8,19 +8,55 @@ import re
 SUPPORTED_EXTENSIONS = {"mp4", "3gp", "avi", "mov"}
 
 #Find out Duration from youtube
-def get_youtube_duration(url):
-    ydl_opts = {
-        'quiet': True,
-        'skip_download': True  # Important: only fetch info
-    }
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=False)
-        duration = info.get('duration')  # duration in seconds
-        return duration
+import json
+import sys
 
-# url = "https://youtu.be/v4t0E3S1N1k?si=1nJ0wJ6KBzK4N9NF"
+def get_youtube_duration(url):
+    try:
+        # Step 0: Update yt-dlp to latest version
+        subprocess.run([sys.executable, "-m", "pip", "install", "--upgrade", "yt-dlp"], check=True)
+        
+        # Step 1: Extract info using yt-dlp with Android client
+        result = subprocess.run(
+            [
+                "yt-dlp",
+                "--extractor-args", "youtube:player_client=android",
+                "-J",          # JSON output
+                "--skip-download",
+                url
+            ],
+            capture_output=True,
+            text=True
+        )
+
+        if result.returncode != 0:
+            print("yt-dlp error:", result.stderr)
+            return None
+
+        # Step 2: Parse JSON
+        info = json.loads(result.stdout)
+        duration = info.get("duration")
+
+        if duration is None:
+            print("⚠️ Duration not available (SABR-only / restricted video)")
+            return None
+
+        return duration  # in seconds
+
+    except subprocess.CalledProcessError as e:
+        print("Subprocess error:", e)
+        return None
+    except json.JSONDecodeError as e:
+        print("JSON decode error:", e)
+        return None
+    except Exception as e:
+        print("Unexpected error:", e)
+        return None
+
+# Example usage
+# url = "https://www.youtube.com/watch?v=v4t0E3S1N1k"
 # duration_seconds = get_youtube_duration(url)
-# print("Duration (seconds):", duration_seconds)
+# print("Video Duration (seconds):", duration_seconds)
 
 #Find out Duration from google Drive
 def extract_drive_file_id(url):

@@ -40,7 +40,7 @@ def upload_video(video_url, video_type, lang, prefer_length, clip_number, aspect
         "contentAnalysis": True,
         "ext": ext
     }
-    print("data-----------", data)
+    # print("data-----------", data)
     try:
         response = requests.post(
             "https://elb-api.vizard.ai/hvizard-server-front/open-api/v1/project/create",
