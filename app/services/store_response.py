@@ -33,13 +33,13 @@ def store_response_in_db(id, auth_token, response_data, credit_usage):
         })
 
     print(f"Posting clip-segments to {response_route_url}")
-    # print("Payload:", data)
+    print("Payload:", data)
 
     try:
         response = requests.post(response_route_url, json=data, headers=headers)
         print("Response Status Code:", response.status_code)
         # print("Response Body:", response.text)
-        response.raise_for_status()  # JSON এ রূপান্তরের আগে কল করো
+        response.raise_for_status() 
         return {"status": "success"}
     except requests.exceptions.RequestException as e:
         print("Error storing clip segments in DB:", e)

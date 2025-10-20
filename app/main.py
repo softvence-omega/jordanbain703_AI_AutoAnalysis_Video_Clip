@@ -10,18 +10,22 @@ app = FastAPI(
 
 origins = [
     "http://localhost:3000",
-    "http://65.49.81.27:3000"
+    "http://65.49.81.27:3000",
+    "https://api.reelty.com.au",
+    "https://www.reelty.com.au",
+    "http://localhost:8080"
+    "http://65.49.81.27:5000/api/v1"
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
+    allow_origins=["*"],  # Allow all origins
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-app.include_router(router)
+app.include_router(router, prefix="/ai")
 
 @app.get("/")
 def read_root():
