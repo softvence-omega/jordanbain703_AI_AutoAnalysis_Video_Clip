@@ -4,6 +4,14 @@ import os
 from datetime import datetime
 
 def Download_File(url, file_path):
+    # Validate URL
+    if not url or not url.strip():
+        raise ValueError("URL cannot be empty")
+    
+    url = url.strip()
+    if not url.startswith(('http://', 'https://')):
+        raise ValueError(f"Invalid URL scheme: {url}")
+    
     # Parse URL
     parsed_url = urlparse(url)
     # Get path part
@@ -25,6 +33,7 @@ def Download_File(url, file_path):
         return save_path
 
     r = requests.get(url)
+    r.raise_for_status()
     with open(save_path, 'wb') as f:
         f.write(r.content)
     print(f"saved successfully file- {save_path}")

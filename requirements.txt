@@ -12,3 +12,4 @@ yt_dlp
 imageio-ffmpeg
 gdown
 httpx
+websocket-client

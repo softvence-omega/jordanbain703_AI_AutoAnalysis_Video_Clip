@@ -1,0 +1,10 @@
+{
+  "auth_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJjbWYweXo0OHQwMDA1dW01czJ0eDJwc2RzIiwiZW1haWwiOiJtb2hlYnVsbGFvZmZpY2VAZ21haWwuY29tIiwicm9sZSI6IlVTRVIiLCJpYXQiOjE3NjE2MjA1MjEsImV4cCI6MTc2MTYzODUyMX0.lG0bjA_4TWShSXAPqb7u6Jf_44J2ofuFEd1-KpXA30w",
+  "url": "https://youtu.be/thpF81-wrMs?si=fcb30TSUBOEXgKuK",
+  "videoType": 2,
+  "langCode": "en",
+  "clipLength": 1,
+  "maxClipNumber": 2,
+  "templateId": "22",
+  "prompt": "i need some specific funny parts"
+}
