@@ -5,12 +5,12 @@ import requests
 import threading
 import sys
 
-BASE_URL = "http://localhost:8080/ai"
-WS_URL = "ws://localhost:8080/ai"
+BASE_URL = "http://184.105.3.172:8000/ai"
+WS_URL = "ws://184.105.3.172:8000/ai"
 
 def test_websocket_connection(project_id):
     """Test WebSocket with better connection stability"""
-    ws_url = f"{WS_URL}/ws/{project_id}"
+    ws_url = f"{WS_URL}/ws/connect/{project_id}"
     print(f"🔗 Connecting to: {ws_url}\n")
     
     messages_received = []
@@ -144,18 +144,19 @@ def test_complete_flow():
     print("\n📤 Step 1: Starting video processing...")
     
     payload = {
-    "auth_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJjbWYweXo0OHQwMDA1dW01czJ0eDJwc2RzIiwiZW1haWwiOiJtb2hlYnVsbGFvZmZpY2VAZ21haWwuY29tIiwicm9sZSI6IlVTRVIiLCJpYXQiOjE3NjE2MjA1MjEsImV4cCI6MTc2MTYzODUyMX0.lG0bjA_4TWShSXAPqb7u6Jf_44J2ofuFEd1-KpXA30w",
+    "auth_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJjbWlwbTduejIwMDAwZ3gxcWk5djBrZGw2IiwiZW1haWwiOiJzb2hhZ2lzbGFtZGV2ZWxvcGVyQGdtYWlsLmNvbSIsInJvbGUiOiJVU0VSIiwiaWF0IjoxNzY1MTg2ODg1LCJleHAiOjE3NjUyMDQ4ODV9.F6dlRm9K3yyVIqH2ngcMQ01R8H0z-1F3K8fteEwAcCQ",
     "url": "https://youtu.be/thpF81-wrMs?si=fcb30TSUBOEXgKuK",
     "videoType": 2,
     "langCode": "en",
     "clipLength": 1,
     "maxClipNumber": 2,
-    "templateId": "22",
+    "templateId": "27",
     "prompt": "i need some specific funny parts"
     }
     
     try:
-        response = requests.post(f"{BASE_URL}/generate", json=payload, timeout=30)
+        response = requests.post(f"{BASE_URL}/generate", json=payload, timeout=120)
+        print(f"⏳ Response...", response)
         
         if response.status_code != 200:
             print(f"❌ HTTP {response.status_code}: {response.text}")

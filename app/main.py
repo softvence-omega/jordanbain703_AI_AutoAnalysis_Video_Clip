@@ -11,16 +11,16 @@ app = FastAPI(
 
 origins = [
     "http://localhost:3000",
-    "http://65.49.81.27:3000",
+    "http://184.105.3.172:3000",
     "https://api.reelty.com.au",
     "https://www.reelty.com.au",
     "http://localhost:8080"
-    "http://65.49.81.27:5000/api/v1"
+    "http://184.105.3.172:5000/api/v1"
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins
+    allow_origins=origins,  # Allow all origins
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],

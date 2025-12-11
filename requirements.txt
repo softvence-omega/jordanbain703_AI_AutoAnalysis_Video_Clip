@@ -9,6 +9,7 @@ cloudinary
 sentence-transformers
 numpy==1.26.4
 yt_dlp
+ffmpeg
 imageio-ffmpeg
 gdown
 httpx

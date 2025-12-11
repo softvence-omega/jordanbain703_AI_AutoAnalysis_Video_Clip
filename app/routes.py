@@ -200,7 +200,7 @@ async def handle_generate_clip(request: paramRequest):
         return {"error": str(e)}
 
 
-@router.websocket("/ws/{project_id}")
+@router.websocket("/ws/connect/{project_id}")
 async def websocket_endpoint(websocket: WebSocket, project_id: str):
     """
     WebSocket endpoint with message queue processing
