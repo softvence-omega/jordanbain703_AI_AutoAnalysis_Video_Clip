@@ -200,12 +200,128 @@ async def handle_generate_clip(request: paramRequest):
         return {"error": str(e)}
 
 
+# @router.websocket("/ws/connect/{project_id}")
+# async def websocket_endpoint(websocket: WebSocket, project_id: str):
+#     """
+#     WebSocket endpoint with message queue processing
+#     """
+#     print(f"🔌 WebSocket connection attempt for: {project_id}")
+    
+#     try:
+#         await manager.connect(websocket, project_id)
+#         print(f"✅ Connection established for {project_id}")
+        
+#         # Send connection confirmation
+#         await websocket.send_text(json.dumps({
+#             "type": "connected",
+#             "project_id": project_id,
+#             "message": "Connected - waiting for processing",
+#             "timestamp": time.time()
+#         }))
+        
+#         # Send initial progress if task exists
+#         actual_key = find_project_in_pending(project_id)
+#         print("actual key found----------------", actual_key)
+#         if actual_key is not None:
+#             print(f"⏳ Sending initial progress for {project_id}")
+#             await manager.send_progress(
+#                 project_id, 
+#                 25, 
+#                 "Processing started - waiting for Vizard webhook..."
+#             )
+        
+#         # Start message queue processor in background
+#         queue_task = asyncio.create_task(
+#             manager.process_message_queue(project_id, websocket)
+#         )
+        
+#         # Keep connection alive and handle client messages
+#         last_keepalive = time.time()
+#         keepalive_interval = 45
+        
+#         while True:
+#             try:
+#                 # Wait for client messages
+#                 data = await asyncio.wait_for(
+#                     websocket.receive_text(),
+#                     timeout=keepalive_interval
+#                 )
+                
+#                 # Handle client messages
+#                 try:
+#                     msg = json.loads(data)
+#                     msg_type = msg.get("type")
+                    
+#                     if msg_type == "ping":
+#                         # Reply to ping
+#                         await websocket.send_text(json.dumps({
+#                             "type": "pong",
+#                             "timestamp": time.time()
+#                         }))
+#                         print(f"💓 Ping→Pong for {project_id}")
+#                         last_keepalive = time.time()
+                        
+#                     elif msg_type == "status":
+#                         actual_key = find_project_in_pending(project_id)
+#                         status = "processing" if actual_key is not None else "unknown"
+#                         await websocket.send_text(json.dumps({
+#                             "type": "status_response",
+#                             "status": status,
+#                             "project_id": project_id,
+#                             "timestamp": time.time()
+#                         }))
+                        
+#                 except json.JSONDecodeError:
+#                     print(f"⚠️ Invalid JSON from {project_id}")
+                    
+#             except asyncio.TimeoutError:
+#                 # Send keepalive
+#                 current_time = time.time()
+#                 if current_time - last_keepalive >= keepalive_interval:
+#                     try:
+#                         await websocket.send_text(json.dumps({
+#                             "type": "keepalive",
+#                             "message": "Connection alive",
+#                             "project_id": project_id,
+#                             "timestamp": current_time
+#                         }))
+#                         print(f"💓 Keepalive → {project_id}")
+#                         last_keepalive = current_time
+#                     except Exception as e:
+#                         print(f"❌ Keepalive failed: {e}")
+#                         break
+                        
+#             except WebSocketDisconnect:
+#                 print(f"🔌 Client disconnected: {project_id}")
+#                 break
+#             except Exception as e:
+#                 print(f"❌ Error for {project_id}: {e}")
+#                 break
+        
+#         # Cancel queue processor
+#         queue_task.cancel()
+#         try:
+#             await queue_task
+#         except asyncio.CancelledError:
+#             pass
+                
+#     except Exception as e:
+#         print(f"❌ WebSocket error for {project_id}: {e}")
+#         import traceback
+#         traceback.print_exc()
+        
+#     finally:
+#         manager.disconnect(project_id)
+#         print(f"🔌 WebSocket cleanup complete for {project_id}")
 @router.websocket("/ws/connect/{project_id}")
 async def websocket_endpoint(websocket: WebSocket, project_id: str):
     """
-    WebSocket endpoint with message queue processing
+    WebSocket endpoint with improved connection stability
     """
     print(f"🔌 WebSocket connection attempt for: {project_id}")
+    
+    queue_task = None
+    keepalive_task = None
     
     try:
         await manager.connect(websocket, project_id)
@@ -227,7 +343,7 @@ async def websocket_endpoint(websocket: WebSocket, project_id: str):
             await manager.send_progress(
                 project_id, 
                 25, 
-                "Processing started - waiting for Vizard webhook..."
+                "Processing started - waiting for Vizard webhook (may take 1-5 minutes)..."
             )
         
         # Start message queue processor in background
@@ -235,35 +351,51 @@ async def websocket_endpoint(websocket: WebSocket, project_id: str):
             manager.process_message_queue(project_id, websocket)
         )
         
-        # Keep connection alive and handle client messages
-        last_keepalive = time.time()
-        keepalive_interval = 45
+        # Start server-side keepalive task
+        async def send_keepalives():
+            """Send keepalive messages from server side"""
+            try:
+                while True:
+                    await asyncio.sleep(30)  # Every 30 seconds
+                    try:
+                        actual_key = find_project_in_pending(project_id)
+                        status = "processing" if actual_key is not None else "waiting"
+                        
+                        await websocket.send_text(json.dumps({
+                            "type": "keepalive",
+                            "message": f"Connection alive - {status}",
+                            "project_id": project_id,
+                            "timestamp": time.time(),
+                            "waiting_time": int(time.time() - pending_clips[actual_key]['created_at']) if actual_key else 0
+                        }))
+                        print(f"💓 Server keepalive → {project_id} ({status})")
+                    except Exception as e:
+                        print(f"⚠️ Keepalive send failed: {e}")
+            except asyncio.CancelledError:
+                print(f"🛑 Keepalive task cancelled for {project_id}")
         
+        keepalive_task = asyncio.create_task(send_keepalives())
+        
+        # Listen for client messages
         while True:
             try:
-                # Wait for client messages
-                data = await asyncio.wait_for(
-                    websocket.receive_text(),
-                    timeout=keepalive_interval
-                )
+                data = await websocket.receive_text()
                 
-                # Handle client messages
                 try:
                     msg = json.loads(data)
                     msg_type = msg.get("type")
                     
                     if msg_type == "ping":
-                        # Reply to ping
+                        # Reply to ping immediately
                         await websocket.send_text(json.dumps({
                             "type": "pong",
                             "timestamp": time.time()
                         }))
                         print(f"💓 Ping→Pong for {project_id}")
-                        last_keepalive = time.time()
                         
                     elif msg_type == "status":
                         actual_key = find_project_in_pending(project_id)
-                        status = "processing" if actual_key is not None else "unknown"
+                        status = "processing" if actual_key is not None else "completed"
                         await websocket.send_text(json.dumps({
                             "type": "status_response",
                             "status": status,
@@ -274,46 +406,38 @@ async def websocket_endpoint(websocket: WebSocket, project_id: str):
                 except json.JSONDecodeError:
                     print(f"⚠️ Invalid JSON from {project_id}")
                     
-            except asyncio.TimeoutError:
-                # Send keepalive
-                current_time = time.time()
-                if current_time - last_keepalive >= keepalive_interval:
-                    try:
-                        await websocket.send_text(json.dumps({
-                            "type": "keepalive",
-                            "message": "Connection alive",
-                            "project_id": project_id,
-                            "timestamp": current_time
-                        }))
-                        print(f"💓 Keepalive → {project_id}")
-                        last_keepalive = current_time
-                    except Exception as e:
-                        print(f"❌ Keepalive failed: {e}")
-                        break
-                        
             except WebSocketDisconnect:
                 print(f"🔌 Client disconnected: {project_id}")
                 break
             except Exception as e:
                 print(f"❌ Error for {project_id}: {e}")
+                import traceback
+                traceback.print_exc()
                 break
         
-        # Cancel queue processor
-        queue_task.cancel()
-        try:
-            await queue_task
-        except asyncio.CancelledError:
-            pass
-                
     except Exception as e:
         print(f"❌ WebSocket error for {project_id}: {e}")
         import traceback
         traceback.print_exc()
         
     finally:
+        # Cancel background tasks
+        if keepalive_task:
+            keepalive_task.cancel()
+            try:
+                await keepalive_task
+            except asyncio.CancelledError:
+                pass
+        
+        if queue_task:
+            queue_task.cancel()
+            try:
+                await queue_task
+            except asyncio.CancelledError:
+                pass
+        
         manager.disconnect(project_id)
         print(f"🔌 WebSocket cleanup complete for {project_id}")
-
 
 # Debugging endpoint - check connection status
 @router.get("/ws/status/{project_id}", tags=["Debug"])

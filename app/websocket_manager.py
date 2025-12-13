@@ -1,157 +1,167 @@
-# websocket_manager.py - FIXED VERSION
-import json
-from fastapi import WebSocket
-from starlette.websockets import WebSocketState
-from typing import Dict
-import time
 import asyncio
-
+import json
+import time
+from fastapi import WebSocket
+from typing import Dict, List, Optional
 
 class ConnectionManager:
     def __init__(self):
         self.active_connections: Dict[str, WebSocket] = {}
+        self.message_queues: Dict[str, List[dict]] = {}
         self.connection_times: Dict[str, float] = {}
-        self.last_activity: Dict[str, float] = {}
-        self.message_queues: Dict[str, asyncio.Queue] = {}
-
-    async def connect(self, websocket: WebSocket, project_id):
-        """Accept and store WebSocket connection"""
-        project_id = str(project_id)  # Always convert to string
+    
+    async def connect(self, websocket: WebSocket, project_id: str):
+        """Accept WebSocket connection"""
         await websocket.accept()
         self.active_connections[project_id] = websocket
         self.connection_times[project_id] = time.time()
-        self.last_activity[project_id] = time.time()
-        self.message_queues[project_id] = asyncio.Queue()
+        
+        # Initialize message queue if not exists
+        if project_id not in self.message_queues:
+            self.message_queues[project_id] = []
+        
         print(f"✅ WebSocket connected for project: {project_id}")
         print(f"📊 Active connections: {len(self.active_connections)}")
-
-    def disconnect(self, project_id):
+    
+    def disconnect(self, project_id: str):
         """Remove WebSocket connection"""
-        project_id = str(project_id)  # Always convert to string
         if project_id in self.active_connections:
-            uptime = time.time() - self.connection_times.get(project_id, time.time())
+            connection_duration = time.time() - self.connection_times.get(project_id, time.time())
             del self.active_connections[project_id]
-            if project_id in self.connection_times:
-                del self.connection_times[project_id]
-            if project_id in self.last_activity:
-                del self.last_activity[project_id]
-            if project_id in self.message_queues:
-                del self.message_queues[project_id]
-            print(f"🔌 Disconnected: {project_id} (was connected for {uptime:.1f}s)")
+            print(f"🔌 Disconnected: {project_id} (was connected for {connection_duration:.1f}s)")
             print(f"📊 Active connections: {len(self.active_connections)}")
-
-    def is_connected(self, project_id) -> bool:
-        """
-        FIXED: Simple check - if in active_connections, it's connected
-        The queue-based approach handles disconnections automatically
-        """
-        project_id = str(project_id)  # Always convert to string
+        
+        # Clean up message queue
+        if project_id in self.message_queues:
+            del self.message_queues[project_id]
+        
+        if project_id in self.connection_times:
+            del self.connection_times[project_id]
+    
+    def is_connected(self, project_id: str) -> bool:
+        """Check if client is connected"""
         return project_id in self.active_connections
-
-    async def send_message(self, project_id, message: dict) -> bool:
+    
+    async def send_message(self, project_id: str, message: dict):
         """
-        FIXED: Always queue message if connection exists
-        Don't check is_connected() - just check if in active_connections
+        Send message to client or queue it if not connected
+        IMPORTANT: Check both string and int versions of project_id
         """
-        project_id = str(project_id)  # Always convert to string
+        # Try to find the actual key (could be string or int)
+        actual_key = None
         
-        if project_id not in self.active_connections:
-            print(f"⚠️ No active connection for project: {project_id}")
-            print(f"📊 Active projects: {list(self.active_connections.keys())}")
-            return False
+        # Check exact match first
+        if project_id in self.active_connections:
+            actual_key = project_id
+        else:
+            # Try converting types
+            try:
+                # Try as int
+                int_id = int(project_id) if isinstance(project_id, str) else project_id
+                if int_id in self.active_connections:
+                    actual_key = int_id
+                
+                # Try as string
+                str_id = str(project_id)
+                if str_id in self.active_connections:
+                    actual_key = str_id
+            except (ValueError, TypeError):
+                pass
         
-        if project_id not in self.message_queues:
-            print(f"⚠️ No message queue for: {project_id}")
-            return False
-        
-        try:
-            # Queue message
-            await self.message_queues[project_id].put(message)
-            
-            msg_type = message.get('type', 'unknown')
-            if msg_type in ['result', 'error', 'progress']:
-                progress = message.get('progress', '')
-                progress_str = f" ({progress}%)" if progress else ""
-                print(f"📥 Queued {msg_type}{progress_str} for {project_id}")
-            
-            return True
-            
-        except Exception as e:
-            print(f"❌ Failed to queue message for {project_id}: {e}")
-            # If queue fails, remove connection
-            self.disconnect(project_id)
+        if actual_key is not None:
+            try:
+                websocket = self.active_connections[actual_key]
+                await websocket.send_text(json.dumps(message))
+                msg_type = message.get('type', 'message')
+                progress = f" ({message.get('progress')}%)" if 'progress' in message else ''
+                print(f"✅ Sent {msg_type}{progress} to {project_id}")
+                return True
+            except Exception as e:
+                print(f"❌ Failed to send message to {project_id}: {e}")
+                # Queue the message for retry
+                if project_id not in self.message_queues:
+                    self.message_queues[project_id] = []
+                self.message_queues[project_id].append(message)
+                print(f"📥 Queued message for later delivery")
+                return False
+        else:
+            # Client not connected yet, queue the message
+            if project_id not in self.message_queues:
+                self.message_queues[project_id] = []
+            self.message_queues[project_id].append(message)
+            msg_type = message.get('type', 'message')
+            progress = f" ({message.get('progress')}%)" if 'progress' in message else ''
+            print(f"📥 Queued {msg_type}{progress} for {project_id} (connection not found)")
+            print(f"🔍 Active connections: {list(self.active_connections.keys())}")
             return False
     
-    async def process_message_queue(self, project_id, websocket: WebSocket):
-        """Process queued messages - runs in background"""
-        project_id = str(project_id)  # Always convert to string
-        queue = self.message_queues.get(project_id)
-        if not queue:
-            print(f"⚠️ No queue for {project_id}")
-            return
-        
+    async def process_message_queue(self, project_id: str, websocket: WebSocket):
+        """
+        Process queued messages for a connection
+        CRITICAL: This must continuously check for new messages
+        """
         print(f"🎬 Starting message processor for {project_id}")
+        processed_count = 0
         
         try:
-            while project_id in self.active_connections:
-                try:
-                    # Wait for message with timeout
-                    message = await asyncio.wait_for(queue.get(), timeout=2.0)
+            while True:
+                # Check if there are queued messages
+                if project_id in self.message_queues and self.message_queues[project_id]:
+                    # Get all pending messages
+                    messages_to_send = self.message_queues[project_id].copy()
+                    self.message_queues[project_id].clear()
                     
-                    # Try to send
-                    try:
-                        await websocket.send_text(json.dumps(message))
-                        self.last_activity[project_id] = time.time()
-                        
-                        msg_type = message.get('type', 'unknown')
-                        if msg_type in ['result', 'error', 'progress']:
+                    # Send each message
+                    for message in messages_to_send:
+                        try:
+                            await websocket.send_text(json.dumps(message))
+                            processed_count += 1
+                            msg_type = message.get('type', 'unknown')
                             progress = message.get('progress', '')
-                            progress_str = f" ({progress}%)" if progress else ""
-                            print(f"✅ Sent {msg_type}{progress_str} to {project_id}")
-                        
-                        queue.task_done()
-                        
-                    except Exception as send_error:
-                        print(f"❌ Failed to send to {project_id}: {send_error}")
-                        # Connection broken, exit loop
-                        break
-                    
-                except asyncio.TimeoutError:
-                    # No message, continue
-                    continue
-                    
+                            print(f"✅ Sent queued {msg_type} {f'({progress}%)' if progress else ''} to {project_id}")
+                        except Exception as e:
+                            print(f"❌ Failed to send queued message: {e}")
+                            # Re-queue failed message
+                            if project_id in self.message_queues:
+                                self.message_queues[project_id].append(message)
+                            break
+                
+                # Small delay to avoid busy waiting
+                # IMPORTANT: Must be small enough to catch new messages quickly
+                await asyncio.sleep(0.1)  # Check every 100ms
+                
+        except asyncio.CancelledError:
+            print(f"🛑 Message processor stopped for {project_id} (processed {processed_count} messages)")
+            raise
         except Exception as e:
             print(f"❌ Message processor error for {project_id}: {e}")
-        finally:
-            print(f"🛑 Message processor stopped for {project_id}")
-
-    async def send_progress(self, project_id, progress: int, message: str, **extra_data):
+            import traceback
+            traceback.print_exc()
+    
+    async def send_progress(self, project_id: str, progress: int, message: str, **kwargs):
         """Send progress update"""
-        project_id = str(project_id)  # Always convert to string
         payload = {
             "type": "progress",
             "progress": progress,
             "message": message,
             "project_id": project_id,
             "timestamp": time.time(),
-            **extra_data
+            **kwargs
         }
-        return await self.send_message(project_id, payload)
-
-    async def send_result(self, project_id, result: dict):
+        await self.send_message(project_id, payload)
+    
+    async def send_result(self, project_id: str, result: dict):
         """Send final result"""
-        project_id = str(project_id)  # Always convert to string
         payload = {
             "type": "result",
             "result": result,
             "project_id": project_id,
             "timestamp": time.time()
         }
-        return await self.send_message(project_id, payload)
-
-    async def send_error(self, project_id, error_message: str, error_code: str = None):
+        await self.send_message(project_id, payload)
+    
+    async def send_error(self, project_id: str, error_message: str, error_code: str = "UNKNOWN"):
         """Send error message"""
-        project_id = str(project_id)  # Always convert to string
         payload = {
             "type": "error",
             "message": error_message,
@@ -159,50 +169,42 @@ class ConnectionManager:
             "project_id": project_id,
             "timestamp": time.time()
         }
-        return await self.send_message(project_id, payload)
-
-    async def send_cancelled(self, project_id):
-        """Send cancellation notice"""
-        project_id = str(project_id)  # Always convert to string
+        await self.send_message(project_id, payload)
+    
+    async def send_cancelled(self, project_id: str):
+        """Send cancellation notification"""
         payload = {
             "type": "cancelled",
-            "message": "Task was cancelled by user",
+            "message": "Task was cancelled",
             "project_id": project_id,
             "timestamp": time.time()
         }
-        return await self.send_message(project_id, payload)
-
-    async def broadcast(self, message: dict):
-        """Send message to all connected clients"""
-        results = []
-        for project_id in list(self.active_connections.keys()):
-            success = await self.send_message(project_id, message)
-            results.append(success)
-        return sum(results)
-
-    def get_connection_info(self, project_id) -> dict:
-        """Get detailed connection information"""
-        project_id = str(project_id)  # Always convert to string
-        if project_id not in self.active_connections:
-            return {"connected": False}
+        await self.send_message(project_id, payload)
+    
+    def get_connection_info(self, project_id: str) -> dict:
+        """Get connection information for debugging"""
+        is_connected = project_id in self.active_connections
+        queue_size = len(self.message_queues.get(project_id, []))
+        connected_duration = None
         
-        websocket = self.active_connections[project_id]
-        state = "UNKNOWN"
-        
-        try:
-            if hasattr(websocket, 'client_state'):
-                state = str(websocket.client_state)
-        except:
-            pass
+        if is_connected and project_id in self.connection_times:
+            connected_duration = time.time() - self.connection_times[project_id]
         
         return {
-            "connected": True,
-            "uptime": time.time() - self.connection_times.get(project_id, time.time()),
-            "last_activity": time.time() - self.last_activity.get(project_id, time.time()),
-            "websocket_state": state,
-            "queue_size": self.message_queues[project_id].qsize() if project_id in self.message_queues else 0
+            "connected": is_connected,
+            "queue_size": queue_size,
+            "connected_duration_seconds": connected_duration,
+            "queued_messages": self.message_queues.get(project_id, [])[:5] if queue_size > 0 else []
         }
-
+    
+    def get_stats(self) -> dict:
+        """Get overall manager statistics"""
+        return {
+            "active_connections": len(self.active_connections),
+            "projects_with_queues": len(self.message_queues),
+            "total_queued_messages": sum(len(q) for q in self.message_queues.values()),
+            "connections": list(self.active_connections.keys())
+        }
 
 # Global instance
 manager = ConnectionManager()
