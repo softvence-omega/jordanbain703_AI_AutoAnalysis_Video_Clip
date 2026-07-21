@@ -1,6 +1,5 @@
 .venv/
 venv/
-.env
 # Ignore virtual environment directories
 __pycache__/    
 # Ignore Python bytecode cache directories
@@ -12,3 +11,5 @@ branch_structure.json
 temp_auto_push.bat
 temp_interactive_push.bat
 .gitignore
+config.bat
+node_modules
